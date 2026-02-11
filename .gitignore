@@ -32,7 +32,8 @@ eggs/
 .DS_Store
 Thumbs.db
 
-# Variables de entorno (secretos)
+# Variables de entorno y configuración con secretos
 .env
 .env.local
 *.env
+config.ini

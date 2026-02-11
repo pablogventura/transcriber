@@ -1,0 +1,7 @@
+# Copiar a config.ini y completar con tu API key.
+# config.ini está en .gitignore y no se sube al repositorio.
+
+[openai]
+api_key = sk-tu-token-aqui
+base_url = https://chat.ccad.unc.edu.ar/ollama/v1
+model = gpt-oss:20b
