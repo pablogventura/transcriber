@@ -4,6 +4,7 @@ import argparse
 import configparser
 import json
 import os
+import sys
 from pathlib import Path
 
 import ctranslate2
@@ -68,6 +69,25 @@ def _cargar_config_openai() -> dict:
     out["api_key"] = os.environ.get("OPENAI_API_KEY") or out["api_key"]
     out["base_url"] = os.environ.get("OPENAI_BASE_URL") or out["base_url"] or "https://chat.ccad.unc.edu.ar/ollama/v1"
     return out
+
+
+def _guardar_config_openai(
+    api_key: str,
+    base_url: str,
+    model: str,
+    config_path: Path,
+) -> None:
+    """Escribe config.ini con la sección [openai]."""
+    parser = configparser.ConfigParser()
+    if config_path.exists():
+        parser.read(config_path, encoding="utf-8")
+    if not parser.has_section("openai"):
+        parser.add_section("openai")
+    parser.set("openai", "api_key", api_key)
+    parser.set("openai", "base_url", base_url)
+    parser.set("openai", "model", model)
+    with open(config_path, "w", encoding="utf-8") as f:
+        parser.write(f)
 
 
 def _asegurar_nltk_sumy():
@@ -177,8 +197,31 @@ def main():
     parser = argparse.ArgumentParser(description="Transcribe audio con Whisper.")
     parser.add_argument(
         "audio",
+        nargs="?",
+        default=None,
         metavar="ARCHIVO",
-        help="Archivo de audio a transcribir (ej. grabacion.mp3, entrada.ogg)",
+        help="Archivo de audio a transcribir (obligatorio salvo con --save-config)",
+    )
+    parser.add_argument(
+        "--save-config",
+        action="store_true",
+        help="Guardar token y URL de OpenAI en config.ini (usa --api-key y/o --base-url, o variables de entorno).",
+    )
+    parser.add_argument(
+        "--api-key",
+        metavar="TOKEN",
+        help="Token de API OpenAI (para --save-config). Si no se pasa, se usa OPENAI_API_KEY.",
+    )
+    parser.add_argument(
+        "--base-url",
+        metavar="URL",
+        help="URL base del API (para --save-config). Si no se pasa, se usa OPENAI_BASE_URL o la URL por defecto.",
+    )
+    parser.add_argument(
+        "--model",
+        default="gpt-oss:20b",
+        metavar="MODELO",
+        help="Modelo OpenAI (por defecto: gpt-oss:20b). Se guarda con --save-config.",
     )
     parser.add_argument(
         "--resumen",
@@ -218,6 +261,23 @@ def main():
         help="Emitir la salida en JSON (texto, idioma, resumen y/o respuesta según opciones).",
     )
     args = parser.parse_args()
+
+    if args.save_config:
+        api_key = (args.api_key or os.environ.get("OPENAI_API_KEY") or "").strip()
+        base_url = (
+            (args.base_url or os.environ.get("OPENAI_BASE_URL") or "").strip()
+            or "https://chat.ccad.unc.edu.ar/ollama/v1"
+        )
+        if not api_key:
+            print("Error: indica --api-key o define la variable OPENAI_API_KEY para guardar la configuración.")
+            sys.exit(1)
+        config_path = Path.cwd() / CONFIG_FILENAME
+        _guardar_config_openai(api_key, base_url, args.model or "gpt-oss:20b", config_path)
+        print(f"Configuración guardada en {config_path.resolve()}")
+        return
+
+    if args.audio is None:
+        parser.error("el argumento ARCHIVO es obligatorio (salvo con --save-config)")
 
     try:
         gpu_count = ctranslate2.get_cuda_device_count()
