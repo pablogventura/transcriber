@@ -1,4 +1,4 @@
-"""Permite ejecutar el paquete con: python -m transcriber ARCHIVO ..."""
+"""Run the package with: python -m transcriber FILE ..."""
 
 from transcriber.cli import main
 

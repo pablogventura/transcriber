@@ -1,4 +1,4 @@
-"""CLI de Transcriber: transcripción, resumen y respuesta."""
+"""Transcriber CLI: transcription, summarization, and reply generation."""
 
 import argparse
 import configparser
@@ -21,42 +21,42 @@ from sumy.summarizers.lex_rank import LexRankSummarizer
 from sumy.nlp.stemmers import Stemmer
 from sumy.utils import get_stop_words
 
-# Archivo de configuración: primero cwd (donde se ejecuta), luego junto al paquete
+# Config file: first cwd (where command is run), then next to package
 CONFIG_FILENAME = "config.ini"
 
-# Código de idioma (Whisper, ISO 639-1) -> nombre para sumy (stopwords/stemmer)
-_IDIOMA_WHISPER_A_SUMY = {
+# Language code (Whisper, ISO 639-1) -> sumy name (stopwords/stemmer)
+_LANGUAGE_TO_SUMY = {
     "ar": "arabic", "zh": "chinese", "cs": "czech", "en": "english",
     "fr": "french", "de": "german", "el": "greek", "he": "hebrew",
     "it": "italian", "ja": "japanese", "ko": "korean", "pt": "portuguese",
     "sk": "slovak", "es": "spanish", "uk": "ukrainian",
 }
-_IDIOMA_CODIGO_A_NOMBRE = {
-    "es": "español", "en": "inglés", "fr": "francés", "de": "alemán",
-    "it": "italiano", "pt": "portugués", "ar": "árabe", "zh": "chino",
-    "ja": "japonés", "ko": "coreano", "ru": "ruso", "uk": "ucraniano",
+# For OpenAI prompt: code -> language name
+_LANGUAGE_CODE_TO_NAME = {
+    "es": "Spanish", "en": "English", "fr": "French", "de": "German",
+    "it": "Italian", "pt": "Portuguese", "ar": "Arabic", "zh": "Chinese",
+    "ja": "Japanese", "ko": "Korean", "ru": "Russian", "uk": "Ukrainian",
 }
 
 
-def _idioma_sumy(codigo_whisper: str) -> str:
-    codigo = (codigo_whisper or "en")[:2].lower()
-    return _IDIOMA_WHISPER_A_SUMY.get(codigo, "english")
+def _language_to_sumy(whisper_code: str) -> str:
+    code = (whisper_code or "en")[:2].lower()
+    return _LANGUAGE_TO_SUMY.get(code, "english")
 
 
-def _idioma_nombre_para_prompt(codigo_whisper: str) -> str | None:
-    codigo = (codigo_whisper or "")[:2].lower()
-    return _IDIOMA_CODIGO_A_NOMBRE.get(codigo)
+def _language_name_for_prompt(whisper_code: str) -> str | None:
+    code = (whisper_code or "")[:2].lower()
+    return _LANGUAGE_CODE_TO_NAME.get(code)
 
 
-def _cargar_config_openai() -> dict:
-    """Lee api_key, base_url y model desde config.ini o variables de entorno."""
-    # Primero directorio actual (donde se invoca el comando), luego junto al paquete
+def _load_openai_config() -> dict:
+    """Read api_key, base_url and model from config.ini or environment variables."""
     config_path = Path.cwd() / CONFIG_FILENAME
     if not config_path.exists():
         config_path = Path(__file__).resolve().parent / CONFIG_FILENAME
     if not config_path.exists():
         config_path = Path(__file__).resolve().parent.parent / CONFIG_FILENAME
-    out = {"api_key": "", "base_url": "", "model": "gpt-oss:20b"}
+    out = {"api_key": "", "base_url": "", "model": "gpt-4o-mini"}
     if config_path.exists():
         parser = configparser.ConfigParser()
         parser.read(config_path, encoding="utf-8")
@@ -64,20 +64,20 @@ def _cargar_config_openai() -> dict:
             out["api_key"] = parser.get("openai", "api_key", fallback="").strip()
             out["base_url"] = parser.get(
                 "openai", "base_url", fallback=""
-            ).strip() or "https://chat.ccad.unc.edu.ar/ollama/v1"
-            out["model"] = parser.get("openai", "model", fallback="gpt-oss:20b").strip()
+            ).strip() or "https://api.openai.com/v1"
+            out["model"] = parser.get("openai", "model", fallback="gpt-4o-mini").strip()
     out["api_key"] = os.environ.get("OPENAI_API_KEY") or out["api_key"]
-    out["base_url"] = os.environ.get("OPENAI_BASE_URL") or out["base_url"] or "https://chat.ccad.unc.edu.ar/ollama/v1"
+    out["base_url"] = os.environ.get("OPENAI_BASE_URL") or out["base_url"] or "https://api.openai.com/v1"
     return out
 
 
-def _guardar_config_openai(
+def _save_openai_config(
     api_key: str,
     base_url: str,
     model: str,
     config_path: Path,
 ) -> None:
-    """Escribe config.ini con la sección [openai]."""
+    """Write config.ini with [openai] section."""
     parser = configparser.ConfigParser()
     if config_path.exists():
         parser.read(config_path, encoding="utf-8")
@@ -90,7 +90,7 @@ def _guardar_config_openai(
         parser.write(f)
 
 
-def _asegurar_nltk_sumy():
+def _ensure_nltk_sumy():
     import nltk
     for resource in ("punkt", "punkt_tab"):
         try:
@@ -99,58 +99,58 @@ def _asegurar_nltk_sumy():
             nltk.download(resource, quiet=True)
 
 
-def resumir_texto(texto: str, num_oraciones: int = 3) -> str:
-    if not texto or not texto.strip():
+def summarize_text(text: str, num_sentences: int = 3) -> str:
+    if not text or not text.strip():
         return ""
     auto_abstractor = AutoAbstractor()
     auto_abstractor.tokenizable_doc = SimpleTokenizer()
     auto_abstractor.delimiter_list = [".", "\n", "?", "!"]
     abstractable_doc = TopNRankAbstractor()
-    result_dict = auto_abstractor.summarize(texto.strip(), abstractable_doc)
-    oraciones = result_dict.get("summarize_result", [])[:num_oraciones]
-    return " ".join(oraciones) if oraciones else ""
+    result_dict = auto_abstractor.summarize(text.strip(), abstractable_doc)
+    sentences = result_dict.get("summarize_result", [])[:num_sentences]
+    return " ".join(sentences) if sentences else ""
 
 
-def resumir_texto_sumy(texto: str, num_oraciones: int = 3, idioma: str = "spanish") -> str:
-    if not texto or not texto.strip():
+def summarize_text_sumy(text: str, num_sentences: int = 3, language: str = "spanish") -> str:
+    if not text or not text.strip():
         return ""
-    _asegurar_nltk_sumy()
+    _ensure_nltk_sumy()
     try:
-        parser = PlaintextParser.from_string(texto.strip(), Tokenizer(idioma))
-        stemmer = Stemmer(idioma)
+        parser = PlaintextParser.from_string(text.strip(), Tokenizer(language))
+        stemmer = Stemmer(language)
         summarizer = LexRankSummarizer(stemmer)
-        summarizer.stop_words = get_stop_words(idioma)
-        oraciones = summarizer(parser.document, num_oraciones)
-        return " ".join(str(s) for s in oraciones) if oraciones else ""
+        summarizer.stop_words = get_stop_words(language)
+        sentences = summarizer(parser.document, num_sentences)
+        return " ".join(str(s) for s in sentences) if sentences else ""
     except Exception:
         return ""
 
 
-def resumir_texto_openai(
-    texto: str,
-    num_oraciones: int = 3,
+def summarize_text_openai(
+    text: str,
+    num_sentences: int = 3,
     api_key: str | None = None,
     base_url: str | None = None,
     model: str | None = None,
-    idioma_detectado: str | None = None,
+    detected_language: str | None = None,
 ) -> str:
-    if not texto or not texto.strip():
+    if not text or not text.strip():
         return ""
-    cfg = _cargar_config_openai()
+    cfg = _load_openai_config()
     key = api_key or cfg["api_key"]
     if not key:
         return ""
     base = base_url or cfg["base_url"]
     model_name = model or cfg["model"]
     client = OpenAI(api_key=key, base_url=base)
-    idioma_inst = f" El texto está en {idioma_detectado}." if idioma_detectado else ""
-    system = f"Resumí el texto en forma técnica y breve en aproximadamente {num_oraciones} oraciones.{idioma_inst} Si es posible muestralo con estructura y jerarquía, en el sentido de listas. Resumí en el mismo idioma del texto."
+    lang_inst = f" The text is in {detected_language}." if detected_language else ""
+    system = f"Summarize the text in a technical and concise way in approximately {num_sentences} sentences.{lang_inst} Use structure and hierarchy (e.g. lists) when possible. Summarize in the same language as the text."
     try:
         resp = client.chat.completions.create(
             model=model_name,
             messages=[
                 {"role": "system", "content": system},
-                {"role": "user", "content": texto.strip()},
+                {"role": "user", "content": text.strip()},
             ],
             temperature=0.2,
         )
@@ -160,30 +160,30 @@ def resumir_texto_openai(
         return ""
 
 
-def responder_texto_openai(
-    texto: str,
+def reply_text_openai(
+    text: str,
     api_key: str | None = None,
     base_url: str | None = None,
     model: str | None = None,
-    idioma_detectado: str | None = None,
+    detected_language: str | None = None,
 ) -> str:
-    if not texto or not texto.strip():
+    if not text or not text.strip():
         return ""
-    cfg = _cargar_config_openai()
+    cfg = _load_openai_config()
     key = api_key or cfg["api_key"]
     if not key:
         return ""
     base = base_url or cfg["base_url"]
     model_name = model or cfg["model"]
     client = OpenAI(api_key=key, base_url=base)
-    idioma_inst = f" Responde en {idioma_detectado}." if idioma_detectado else ""
-    system = f"Responde de forma breve al siguiente mensaje.{idioma_inst} Sé directo y conciso."
+    lang_inst = f" Reply in {detected_language}." if detected_language else ""
+    system = f"Reply briefly to the following message.{lang_inst} Be direct and concise."
     try:
         resp = client.chat.completions.create(
             model=model_name,
             messages=[
                 {"role": "system", "content": system},
-                {"role": "user", "content": texto.strip()},
+                {"role": "user", "content": text.strip()},
             ],
             temperature=0.3,
         )
@@ -194,71 +194,71 @@ def responder_texto_openai(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Transcribe audio con Whisper.")
+    parser = argparse.ArgumentParser(description="Transcribe audio with Whisper.")
     parser.add_argument(
         "audio",
         nargs="?",
         default=None,
-        metavar="ARCHIVO",
-        help="Archivo de audio a transcribir (obligatorio salvo con --save-config)",
+        metavar="FILE",
+        help="Audio file to transcribe (required unless using --save-config)",
     )
     parser.add_argument(
         "--save-config",
         action="store_true",
-        help="Guardar token y URL de OpenAI en config.ini (usa --api-key y/o --base-url, o variables de entorno).",
+        help="Save OpenAI token and URL to config.ini (use --api-key and/or --base-url, or env vars).",
     )
     parser.add_argument(
         "--api-key",
         metavar="TOKEN",
-        help="Token de API OpenAI (para --save-config). Si no se pasa, se usa OPENAI_API_KEY.",
+        help="OpenAI API token (for --save-config). Falls back to OPENAI_API_KEY if not set.",
     )
     parser.add_argument(
         "--base-url",
         metavar="URL",
-        help="URL base del API (para --save-config). Si no se pasa, se usa OPENAI_BASE_URL o la URL por defecto.",
+        help="API base URL (for --save-config). Falls back to OPENAI_BASE_URL or default.",
     )
     parser.add_argument(
         "--model",
-        default="gpt-oss:20b",
-        metavar="MODELO",
-        help="Modelo OpenAI (por defecto: gpt-oss:20b). Se guarda con --save-config.",
+        default="gpt-4o-mini",
+        metavar="MODEL",
+        help="OpenAI model (default: gpt-4o-mini). Saved with --save-config.",
     )
     parser.add_argument(
-        "--resumen",
+        "--summary",
         action="store_true",
-        help="Resumir: si hay token OpenAI y responde, usa ese; si no, el más corto entre pysummarization y sumy",
+        help="Summarize: use OpenAI if token works; otherwise shortest of pysummarization and sumy.",
     )
     parser.add_argument(
-        "--resumen-pysummarization",
+        "--summary-pysummarization",
         action="store_true",
-        help="Imprimir un resumen del texto con pysummarization",
+        help="Print a summary using pysummarization.",
     )
     parser.add_argument(
-        "--resumen-oraciones",
+        "--summary-sentences",
         type=int,
         default=3,
         metavar="N",
-        help="Número de oraciones del resumen (por defecto: 3)",
+        help="Number of sentences in the summary (default: 3).",
     )
     parser.add_argument(
-        "--resumen-sumy",
+        "--summary-sumy",
         action="store_true",
-        help="Imprimir un resumen del texto con sumy (LexRank)",
+        help="Print a summary using sumy (LexRank).",
     )
     parser.add_argument(
-        "--resumen-openai",
+        "--summary-openai",
         action="store_true",
-        help="Imprimir un resumen con la API OpenAI (Ollama/CCAD). Requiere config.ini o OPENAI_API_KEY.",
+        help="Print a summary using OpenAI API (Ollama/CCAD). Requires config.ini or OPENAI_API_KEY.",
     )
     parser.add_argument(
-        "--respuesta",
+        "--reply",
         action="store_true",
-        help="Generar una respuesta corta al mensaje transcrito con OpenAI.",
+        help="Generate a short reply to the transcribed message using OpenAI.",
     )
     parser.add_argument(
         "--json",
         action="store_true",
-        help="Emitir la salida en JSON (texto, idioma, resumen y/o respuesta según opciones).",
+        help="Output as JSON (text, language, summary and/or reply depending on options).",
     )
     args = parser.parse_args()
 
@@ -266,18 +266,18 @@ def main():
         api_key = (args.api_key or os.environ.get("OPENAI_API_KEY") or "").strip()
         base_url = (
             (args.base_url or os.environ.get("OPENAI_BASE_URL") or "").strip()
-            or "https://chat.ccad.unc.edu.ar/ollama/v1"
+            or "https://api.openai.com/v1"
         )
         if not api_key:
-            print("Error: indica --api-key o define la variable OPENAI_API_KEY para guardar la configuración.")
+            print("Error: provide --api-key or set OPENAI_API_KEY to save configuration.")
             sys.exit(1)
         config_path = Path.cwd() / CONFIG_FILENAME
-        _guardar_config_openai(api_key, base_url, args.model or "gpt-oss:20b", config_path)
-        print(f"Configuración guardada en {config_path.resolve()}")
+        _save_openai_config(api_key, base_url, args.model or "gpt-4o-mini", config_path)
+        print(f"Configuration saved to {config_path.resolve()}")
         return
 
     if args.audio is None:
-        parser.error("el argumento ARCHIVO es obligatorio (salvo con --save-config)")
+        parser.error("the following arguments are required: FILE (unless --save-config)")
 
     try:
         gpu_count = ctranslate2.get_cuda_device_count()
@@ -291,134 +291,134 @@ def main():
         device, compute_type = "cpu", "int8"
 
     if not args.json:
-        print("Usando GPU (CUDA)" if use_cuda else "Usando CPU")
+        print("Using GPU (CUDA)" if use_cuda else "Using CPU")
 
     model = WhisperModel("large-v3", device=device, compute_type=compute_type)
     segments, info = model.transcribe(args.audio)
 
-    idioma_codigo = getattr(info, "language", None) or ""
-    sumy_idioma = _idioma_sumy(idioma_codigo)
-    idioma_prompt = _idioma_nombre_para_prompt(idioma_codigo)
+    language_code = getattr(info, "language", None) or ""
+    sumy_language = _language_to_sumy(language_code)
+    language_for_prompt = _language_name_for_prompt(language_code)
 
-    texto_completo = " ".join(s.text for s in segments).strip()
+    full_text = " ".join(s.text for s in segments).strip()
 
-    salida = {}
+    output = {}
     if args.json:
-        salida["texto"] = texto_completo
-        salida["idioma"] = idioma_codigo
-        salida["dispositivo"] = "cuda" if use_cuda else "cpu"
+        output["text"] = full_text
+        output["language"] = language_code
+        output["device"] = "cuda" if use_cuda else "cpu"
     else:
-        print(texto_completo)
-        if texto_completo:
+        print(full_text)
+        if full_text:
             print()
 
-    n = args.resumen_oraciones
+    n = args.summary_sentences
 
-    if args.resumen and texto_completo:
-        cfg = _cargar_config_openai()
-        resumen_openai = ""
+    if args.summary and full_text:
+        cfg = _load_openai_config()
+        summary_openai = ""
         if cfg["api_key"]:
-            resumen_openai = resumir_texto_openai(
-                texto_completo, num_oraciones=n, idioma_detectado=idioma_prompt
+            summary_openai = summarize_text_openai(
+                full_text, num_sentences=n, detected_language=language_for_prompt
             )
-        if resumen_openai:
+        if summary_openai:
             if args.json:
-                salida["resumen"] = resumen_openai
-                salida["resumen_origen"] = "openai"
+                output["summary"] = summary_openai
+                output["summary_source"] = "openai"
             else:
-                print("--- Resumen (openai) ---")
-                print(resumen_openai)
+                print("--- Summary (openai) ---")
+                print(summary_openai)
         else:
-            resumen_py = resumir_texto(texto_completo, num_oraciones=n)
-            resumen_sumy = resumir_texto_sumy(
-                texto_completo, num_oraciones=n, idioma=sumy_idioma
+            summary_py = summarize_text(full_text, num_sentences=n)
+            summary_sumy = summarize_text_sumy(
+                full_text, num_sentences=n, language=sumy_language
             )
-            candidatos = [
-                (resumen_py, "pysummarization"),
-                (resumen_sumy, "sumy"),
+            candidates = [
+                (summary_py, "pysummarization"),
+                (summary_sumy, "sumy"),
             ]
-            candidatos = [(t, nombre) for t, nombre in candidatos if t]
-            if candidatos:
-                mas_corto = min(candidatos, key=lambda x: len(x[0]))
-                texto_resumen, nombre = mas_corto
+            candidates = [(t, name) for t, name in candidates if t]
+            if candidates:
+                shortest = min(candidates, key=lambda x: len(x[0]))
+                summary_text, name = shortest
                 if args.json:
-                    salida["resumen"] = texto_resumen
-                    salida["resumen_origen"] = nombre
+                    output["summary"] = summary_text
+                    output["summary_source"] = name
                 else:
-                    print(f"--- Resumen ({nombre}, el más corto) ---")
-                    print(texto_resumen)
+                    print(f"--- Summary ({name}, shortest) ---")
+                    print(summary_text)
             elif not args.json:
-                print("(Texto demasiado corto para generar resumen)")
+                print("(Text too short to generate summary)")
 
-    if args.resumen_pysummarization and texto_completo:
-        resumen = resumir_texto(texto_completo, num_oraciones=n)
-        if resumen:
+    if args.summary_pysummarization and full_text:
+        summary = summarize_text(full_text, num_sentences=n)
+        if summary:
             if args.json:
-                salida["resumen_pysummarization"] = resumen
+                output["summary_pysummarization"] = summary
             else:
-                print("--- Resumen (pysummarization) ---")
-                print(resumen)
+                print("--- Summary (pysummarization) ---")
+                print(summary)
         elif not args.json:
-            print("(Texto demasiado corto para generar resumen)")
+            print("(Text too short to generate summary)")
 
-    if args.resumen_sumy and texto_completo:
-        resumen = resumir_texto_sumy(
-            texto_completo, num_oraciones=n, idioma=sumy_idioma
+    if args.summary_sumy and full_text:
+        summary = summarize_text_sumy(
+            full_text, num_sentences=n, language=sumy_language
         )
-        if resumen:
+        if summary:
             if args.json:
-                salida["resumen_sumy"] = resumen
+                output["summary_sumy"] = summary
             else:
-                print("--- Resumen (sumy) ---")
-                print(resumen)
+                print("--- Summary (sumy) ---")
+                print(summary)
         elif not args.json:
-            print("(Texto demasiado corto para generar resumen con sumy)")
+            print("(Text too short to generate summary with sumy)")
 
-    if args.resumen_openai and texto_completo:
-        cfg = _cargar_config_openai()
+    if args.summary_openai and full_text:
+        cfg = _load_openai_config()
         if not cfg["api_key"]:
             if not args.json:
                 print(
-                    "Error: --resumen-openai requiere api_key en config.ini (sección [openai]) "
-                    "o la variable de entorno OPENAI_API_KEY."
+                    "Error: --summary-openai requires api_key in config.ini ([openai] section) "
+                    "or OPENAI_API_KEY environment variable."
                 )
             else:
-                salida["error_resumen_openai"] = "Falta api_key en config.ini o OPENAI_API_KEY"
+                output["error_summary_openai"] = "Missing api_key in config.ini or OPENAI_API_KEY"
         else:
-            resumen = resumir_texto_openai(
-                texto_completo, num_oraciones=n, idioma_detectado=idioma_prompt
+            summary = summarize_text_openai(
+                full_text, num_sentences=n, detected_language=language_for_prompt
             )
-            if resumen:
+            if summary:
                 if args.json:
-                    salida["resumen_openai"] = resumen
+                    output["summary_openai"] = summary
                 else:
-                    print("--- Resumen (openai) ---")
-                    print(resumen)
+                    print("--- Summary (openai) ---")
+                    print(summary)
             elif not args.json:
-                print("(No se pudo generar resumen con OpenAI)")
+                print("(Could not generate summary with OpenAI)")
 
-    if args.respuesta and texto_completo:
-        cfg = _cargar_config_openai()
+    if args.reply and full_text:
+        cfg = _load_openai_config()
         if not cfg["api_key"]:
             if not args.json:
                 print(
-                    "Error: --respuesta requiere api_key en config.ini (sección [openai]) "
-                    "o la variable de entorno OPENAI_API_KEY."
+                    "Error: --reply requires api_key in config.ini ([openai] section) "
+                    "or OPENAI_API_KEY environment variable."
                 )
             else:
-                salida["error_respuesta"] = "Falta api_key en config.ini o OPENAI_API_KEY"
+                output["error_reply"] = "Missing api_key in config.ini or OPENAI_API_KEY"
         else:
-            respuesta = responder_texto_openai(
-                texto_completo, idioma_detectado=idioma_prompt
+            reply = reply_text_openai(
+                full_text, detected_language=language_for_prompt
             )
-            if respuesta:
+            if reply:
                 if args.json:
-                    salida["respuesta"] = respuesta
+                    output["reply"] = reply
                 else:
-                    print("--- Respuesta ---")
-                    print(respuesta)
+                    print("--- Reply ---")
+                    print(reply)
             elif not args.json:
-                print("(No se pudo generar respuesta con OpenAI)")
+                print("(Could not generate reply with OpenAI)")
 
     if args.json:
-        print(json.dumps(salida, ensure_ascii=False, indent=2))
+        print(json.dumps(output, ensure_ascii=False, indent=2))

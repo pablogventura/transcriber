@@ -1,7 +1,10 @@
-# Copiar a config.ini y completar con tu API key.
-# config.ini está en .gitignore y no se sube al repositorio.
+# Copy to config.ini and add your API key.
+# config.ini is in .gitignore and is not committed.
+#
+# Defaults (if omitted): base_url = https://api.openai.com/v1, model = gpt-4o-mini
+# Example below uses a custom Ollama endpoint:
 
 [openai]
-api_key = sk-tu-token-aqui
-base_url = https://chat.ccad.unc.edu.ar/ollama/v1
+api_key = sk-your-token-here
+base_url = https://api.openai.com/v1
 model = gpt-oss:20b

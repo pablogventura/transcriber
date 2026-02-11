@@ -1,72 +1,76 @@
 # Transcriber
 
-Transcribe audio con [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Whisper), con opciones de resumen (pysummarization, sumy, OpenAI) y respuesta corta con API OpenAI.
+Transcribe audio with [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Whisper), with summarization options (pysummarization, sumy, OpenAI) and short reply generation via OpenAI API.
 
-**Repositorio:** [github.com/pablogventura/transcriber](https://github.com/pablogventura/transcriber)
+**Repository:** [github.com/pablogventura/transcriber](https://github.com/pablogventura/transcriber)
 
-## Instalación
+## Installation
 
-### Con pipx (recomendado: entorno aislado, comando global)
+### With pipx (recommended: isolated env, global command)
 
 ```bash
 pipx install git+https://github.com/pablogventura/transcriber.git
 ```
 
-Para actualizar:
+To upgrade:
 
 ```bash
 pipx upgrade transcriber
 ```
 
-### Con pip (desde el directorio del proyecto)
+### With pip (from project directory)
 
 ```bash
 pip install .
 ```
 
-O en modo editable (desarrollo):
+Or in editable mode (development):
 
 ```bash
 pip install -e .
 ```
 
-O desde el repositorio:
+Or from the repository:
 
 ```bash
 pip install git+https://github.com/pablogventura/transcriber.git
 ```
 
-## Uso
+## Usage
 
-Tras instalar, el comando `transcriber` queda disponible:
+After installing, the `transcriber` command is available:
 
 ```bash
-transcriber ARCHIVO [opciones]
+transcriber FILE [options]
 ```
 
-Ejemplos:
+Examples:
 
 ```bash
-transcriber grabacion.mp3
-transcriber entrevista.ogg --resumen
-transcriber audio.wav --resumen --respuesta --json
+transcriber recording.mp3
+transcriber interview.ogg --summary
+transcriber audio.wav --summary --reply --json
 ```
 
-### Opciones principales
+### Main options
 
-- **ARCHIVO**: archivo de audio a transcribir (obligatorio).
-- `--resumen`: resumen (OpenAI si hay token; si no, el más corto entre pysummarization y sumy).
-- `--resumen-pysummarization` / `--resumen-sumy` / `--resumen-openai`: resumen con un motor concreto.
-- `--resumen-oraciones N`: número de oraciones del resumen (por defecto 3).
-- `--respuesta`: genera una respuesta corta al mensaje con OpenAI.
-- `--json`: salida en JSON.
+- **FILE**: audio file to transcribe (required).
+- `--summary`: summarize (OpenAI if token works; otherwise shortest of pysummarization and sumy).
+- `--summary-pysummarization` / `--summary-sumy` / `--summary-openai`: use a specific summarization backend.
+- `--summary-sentences N`: number of sentences in the summary (default 3).
+- `--reply`: generate a short reply to the message with OpenAI.
+- `--json`: output as JSON.
 
-Para resumen y respuesta con OpenAI se usa `config.ini` (sección `[openai]`) o las variables de entorno `OPENAI_API_KEY` y opcionalmente `OPENAI_BASE_URL`. Ver `config.ini.example`.
-
-## Desarrollo
-
-Sin instalar, desde la raíz del repo:
+For summarization and reply with OpenAI, use `config.ini` (section `[openai]`) or environment variables `OPENAI_API_KEY` and optionally `OPENAI_BASE_URL`. See `config.ini.example`. You can save your token and URL with:
 
 ```bash
-python -m transcriber ARCHIVO [opciones]
+transcriber --save-config --api-key YOUR_TOKEN --base-url https://...
+```
+
+## Development
+
+From the repo root without installing:
+
+```bash
+python -m transcriber FILE [options]
 ```

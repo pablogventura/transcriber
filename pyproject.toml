@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "transcriber"
 version = "0.1.0"
-description = "Transcribe audio con Whisper (faster-whisper), con resúmenes (pysummarization, sumy, OpenAI) y respuesta corta con OpenAI."
+description = "Transcribe audio with Whisper (faster-whisper), with summarization (pysummarization, sumy, OpenAI) and short reply with OpenAI."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
