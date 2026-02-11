@@ -21,8 +21,17 @@ from sumy.summarizers.lex_rank import LexRankSummarizer
 from sumy.nlp.stemmers import Stemmer
 from sumy.utils import get_stop_words
 
-# Config file: first cwd (where command is run), then next to package
+# Config file name
 CONFIG_FILENAME = "config.ini"
+
+
+def _global_config_path() -> Path:
+    """Path to config.ini in user config dir (same for all invocations)."""
+    if os.name == "nt":
+        base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+    else:
+        base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    return base / "summscriber" / CONFIG_FILENAME
 
 # Language code (Whisper, ISO 639-1) -> sumy name (stopwords/stemmer)
 _LANGUAGE_TO_SUMY = {
@@ -51,13 +60,16 @@ def _language_name_for_prompt(whisper_code: str) -> str | None:
 
 def _load_openai_config() -> dict:
     """Read api_key, base_url and model from config.ini or environment variables."""
-    config_path = Path.cwd() / CONFIG_FILENAME
-    if not config_path.exists():
-        config_path = Path(__file__).resolve().parent / CONFIG_FILENAME
-    if not config_path.exists():
-        config_path = Path(__file__).resolve().parent.parent / CONFIG_FILENAME
+    # Look in: cwd, then global config dir, then next to package
+    candidates = [
+        Path.cwd() / CONFIG_FILENAME,
+        _global_config_path(),
+        Path(__file__).resolve().parent / CONFIG_FILENAME,
+        Path(__file__).resolve().parent.parent / CONFIG_FILENAME,
+    ]
+    config_path = next((p for p in candidates if p.exists()), None)
     out = {"api_key": "", "base_url": "", "model": "gpt-4o-mini"}
-    if config_path.exists():
+    if config_path is not None:
         parser = configparser.ConfigParser()
         parser.read(config_path, encoding="utf-8")
         if parser.has_section("openai"):
@@ -276,7 +288,8 @@ def main():
         if not api_key:
             print("Error: provide --api-key or set OPENAI_API_KEY to save configuration.")
             sys.exit(1)
-        config_path = Path.cwd() / CONFIG_FILENAME
+        config_path = _global_config_path()
+        config_path.parent.mkdir(parents=True, exist_ok=True)
         _save_openai_config(api_key, base_url, args.model or "gpt-4o-mini", config_path)
         print(f"Configuration saved to {config_path.resolve()}")
         return
