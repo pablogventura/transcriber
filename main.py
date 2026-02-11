@@ -20,6 +20,34 @@ from sumy.utils import get_stop_words
 # Archivo de configuración (en el directorio del script o del cwd)
 CONFIG_FILENAME = "config.ini"
 
+# Código de idioma (Whisper, ISO 639-1) -> nombre para sumy (stopwords/stemmer)
+# Sumy tiene: arabic, chinese, czech, english, french, german, greek, hebrew,
+# italian, japanese, korean, portuguese, slovak, spanish, ukrainian
+_IDIOMA_WHISPER_A_SUMY = {
+    "ar": "arabic", "zh": "chinese", "cs": "czech", "en": "english",
+    "fr": "french", "de": "german", "el": "greek", "he": "hebrew",
+    "it": "italian", "ja": "japanese", "ko": "korean", "pt": "portuguese",
+    "sk": "slovak", "es": "spanish", "uk": "ukrainian",
+}
+# Para el prompt de OpenAI: código -> nombre del idioma
+_IDIOMA_CODIGO_A_NOMBRE = {
+    "es": "español", "en": "inglés", "fr": "francés", "de": "alemán",
+    "it": "italiano", "pt": "portugués", "ar": "árabe", "zh": "chino",
+    "ja": "japonés", "ko": "coreano", "ru": "ruso",     "uk": "ucraniano",
+}
+
+
+def _idioma_sumy(codigo_whisper: str) -> str:
+    """Convierte código de idioma de Whisper al nombre que usa sumy. Si no hay soporte, usa english."""
+    codigo = (codigo_whisper or "en")[:2].lower()
+    return _IDIOMA_WHISPER_A_SUMY.get(codigo, "english")
+
+
+def _idioma_nombre_para_prompt(codigo_whisper: str) -> str | None:
+    """Nombre del idioma para el prompt de OpenAI; None si no se conoce."""
+    codigo = (codigo_whisper or "")[:2].lower()
+    return _IDIOMA_CODIGO_A_NOMBRE.get(codigo)
+
 
 def _cargar_config_openai() -> dict:
     """Lee api_key, base_url y model desde config.ini o variables de entorno.
@@ -89,6 +117,7 @@ def resumir_texto_openai(
     api_key: str | None = None,
     base_url: str | None = None,
     model: str | None = None,
+    idioma_detectado: str | None = None,
 ) -> str:
     """Genera un resumen del texto con la API OpenAI (ej. Ollama en CCAD)."""
     if not texto or not texto.strip():
@@ -100,7 +129,8 @@ def resumir_texto_openai(
     base = base_url or cfg["base_url"]
     model_name = model or cfg["model"]
     client = OpenAI(api_key=key, base_url=base)
-    system = f"Resumí el texto en forma técnica y breve en aproximadamente {num_oraciones} oraciones."
+    idioma_inst = f" El texto está en {idioma_detectado}." if idioma_detectado else ""
+    system = f"Resumí el texto en forma técnica y breve en aproximadamente {num_oraciones} oraciones.{idioma_inst} Si es posible muestralo con estructura y jerarquía, en el sentido de listas. Resumí en el mismo idioma del texto."
     try:
         resp = client.chat.completions.create(
             model=model_name,
@@ -169,6 +199,11 @@ def main():
     model = WhisperModel("large-v3", device=device, compute_type=compute_type)
     segments, info = model.transcribe(args.audio)
 
+    # Idioma detectado por Whisper (ej. "es", "en"); se usa en resúmenes
+    idioma_codigo = getattr(info, "language", None) or ""
+    sumy_idioma = _idioma_sumy(idioma_codigo)
+    idioma_prompt = _idioma_nombre_para_prompt(idioma_codigo)
+
     texto_completo = " ".join(s.text for s in segments).strip()
     print(texto_completo)
     if texto_completo:
@@ -180,7 +215,9 @@ def main():
         cfg = _cargar_config_openai()
         resumen_openai = ""
         if cfg["api_key"]:
-            resumen_openai = resumir_texto_openai(texto_completo, num_oraciones=n)
+            resumen_openai = resumir_texto_openai(
+                texto_completo, num_oraciones=n, idioma_detectado=idioma_prompt
+            )
         if resumen_openai:
             print("--- Resumen (openai) ---")
             print(resumen_openai)
@@ -188,7 +225,7 @@ def main():
             # Sin token o OpenAI no respondió: usar pysummarization y sumy, elegir el más corto
             resumen_py = resumir_texto(texto_completo, num_oraciones=n)
             resumen_sumy = resumir_texto_sumy(
-                texto_completo, num_oraciones=n, idioma="spanish"
+                texto_completo, num_oraciones=n, idioma=sumy_idioma
             )
             candidatos = [
                 (resumen_py, "pysummarization"),
@@ -213,7 +250,7 @@ def main():
 
     if args.resumen_sumy and texto_completo:
         resumen = resumir_texto_sumy(
-            texto_completo, num_oraciones=n, idioma="spanish"
+            texto_completo, num_oraciones=n, idioma=sumy_idioma
         )
         if resumen:
             print("--- Resumen (sumy) ---")
@@ -229,7 +266,9 @@ def main():
                 "o la variable de entorno OPENAI_API_KEY."
             )
         else:
-            resumen = resumir_texto_openai(texto_completo, num_oraciones=n)
+            resumen = resumir_texto_openai(
+                texto_completo, num_oraciones=n, idioma_detectado=idioma_prompt
+            )
             if resumen:
                 print("--- Resumen (openai) ---")
                 print(resumen)
