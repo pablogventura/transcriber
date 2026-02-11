@@ -1,6 +1,0 @@
-"""Run the package with: python -m transcriber FILE ..."""
-
-from transcriber.cli import main
-
-if __name__ == "__main__":
-    main()

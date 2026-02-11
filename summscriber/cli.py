@@ -1,4 +1,4 @@
-"""Transcriber CLI: transcription, summarization, and reply generation."""
+"""Summscriber CLI: transcription, summarization, and reply generation."""
 
 import argparse
 import configparser
@@ -226,7 +226,12 @@ def main():
     parser.add_argument(
         "--summary",
         action="store_true",
-        help="Summarize: use OpenAI if token works; otherwise shortest of pysummarization and sumy.",
+        help="(Default: on) Summarize: use OpenAI if token works; otherwise shortest of pysummarization and sumy.",
+    )
+    parser.add_argument(
+        "--no-summary",
+        action="store_true",
+        help="Do not generate a summary (disable default summarization).",
     )
     parser.add_argument(
         "--summary-pysummarization",
@@ -314,7 +319,7 @@ def main():
 
     n = args.summary_sentences
 
-    if args.summary and full_text:
+    if full_text and not args.no_summary:
         cfg = _load_openai_config()
         summary_openai = ""
         if cfg["api_key"]:
