@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "transcriber"
+version = "0.1.0"
+description = "Transcribe audio con Whisper (faster-whisper), con resúmenes (pysummarization, sumy, OpenAI) y respuesta corta con OpenAI."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = []
+keywords = ["whisper", "transcription", "speech-to-text", "summarization", "openai"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
+dependencies = [
+    "faster-whisper>=1.0.0",
+    "pysummarization>=1.1.0",
+    "sumy>=0.11.0",
+    "openai>=1.0.0",
+]
+
+[project.scripts]
+transcriber = "transcriber.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["transcriber*"]
