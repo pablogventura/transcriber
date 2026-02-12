@@ -75,6 +75,15 @@ For summarization and reply with OpenAI, use a config file or environment variab
 summscriber --save-config --api-key YOUR_TOKEN --base-url https://...
 ```
 
+### Open .ogg (and other audio) by default with the GUI
+
+You can set **summscriber-gui** as the default application for `.ogg` files (and other audio formats your system associates with it). Then:
+
+1. Download WhatsApp voice messages (or any audio) manually to a folder.
+2. Click on an `.ogg` (or associated) file: it will open with the GUI, which transcribes the audio and shows the summary and suggested reply; the reply is copied to the clipboard so you can paste it straight into WhatsApp.
+
+To set it as default: right‑click an `.ogg` file → “Open with” / “Abrir con” → choose **summscriber-gui** → tick “Use as default” / “Usar como predeterminado” (wording depends on your OS). On GNOME you can also use **Settings → Applications → Default applications** (or **Files → File types**).
+
 ## Development
 
 From the repo root without installing:
