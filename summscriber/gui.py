@@ -110,13 +110,11 @@ def main() -> None:
     full_text_content = ""
 
     def _update_summary_view() -> None:
-        summary_text.config(state=tk.NORMAL)
         summary_text.delete("1.0", tk.END)
         if view_var.get() == "summary":
             _insert_markdown(summary_text, summary_content)
         else:
             summary_text.insert(tk.END, full_text_content or "")
-        summary_text.config(state=tk.DISABLED)
 
     radio_frame = ttk.Frame(main_frame)
     radio_frame.grid(row=0, column=0, sticky=tk.W, pady=(0, 4))
@@ -131,14 +129,37 @@ def main() -> None:
         main_frame,
         height=8,
         wrap=tk.WORD,
-        state=tk.DISABLED,
+        state=tk.NORMAL,
         font=("TkDefaultFont", 10),
         borderwidth=0,
         relief=tk.FLAT,
         highlightthickness=0,
         bg=root.cget("bg"),
+        cursor="arrow",
+        insertwidth=0,
     )
     summary_text.grid(row=1, column=0, sticky=tk.NSEW, pady=(12, 8), padx=(12, 12))
+    summary_text.bind("<Key>", lambda e: "break")
+
+    def _summary_context_menu(event: tk.Event) -> None:
+        try:
+            summary_text.get(tk.SEL_FIRST, tk.SEL_LAST)
+            has_selection = True
+        except tk.TclError:
+            has_selection = False
+        menu = tk.Menu(summary_text, tearoff=0)
+        if has_selection:
+            menu.add_command(
+                label=_("copy_selection"),
+                command=lambda: _copy_selection_to_clipboard(summary_text, root),
+            )
+        menu.add_command(
+            label=_("copy_all"),
+            command=lambda: _copy_all_reply_to_clipboard(summary_text, root),
+        )
+        menu.tk_popup(event.x_root, event.y_root)
+
+    summary_text.bind("<Button-3>", _summary_context_menu)
 
     reply_text = scrolledtext.ScrolledText(
         main_frame, height=6, wrap=tk.WORD, state=tk.NORMAL, font=("TkDefaultFont", 10)
@@ -186,6 +207,7 @@ def main() -> None:
         return "break"
 
     root.bind("<Return>", _close_on_enter)
+    summary_text.bind("<Return>", lambda e: _close_on_enter(e))
     reply_text.bind("<Return>", lambda e: _close_on_enter(e))
 
     def _set_reply(content: str) -> None:
