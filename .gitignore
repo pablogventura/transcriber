@@ -37,3 +37,6 @@ Thumbs.db
 .env.local
 *.env
 config.ini
+
+# Archivos de prueba locales
+test.ogg
