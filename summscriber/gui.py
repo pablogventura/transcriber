@@ -127,19 +127,69 @@ def main() -> None:
     ).pack(side=tk.LEFT, padx=(12, 0))
 
     summary_text = scrolledtext.ScrolledText(
-        main_frame, height=8, wrap=tk.WORD, state=tk.DISABLED, font=("TkDefaultFont", 10)
+        main_frame,
+        height=8,
+        wrap=tk.WORD,
+        state=tk.DISABLED,
+        font=("TkDefaultFont", 10),
+        borderwidth=0,
+        relief=tk.FLAT,
+        highlightthickness=0,
+        bg=root.cget("bg"),
     )
-    summary_text.grid(row=1, column=0, sticky=tk.NSEW, pady=(0, 8))
+    summary_text.grid(row=1, column=0, sticky=tk.NSEW, pady=(12, 8), padx=(12, 12))
 
     reply_text = scrolledtext.ScrolledText(
-        main_frame, height=6, wrap=tk.WORD, state=tk.DISABLED, font=("TkDefaultFont", 10)
+        main_frame, height=6, wrap=tk.WORD, state=tk.NORMAL, font=("TkDefaultFont", 10)
     )
 
+    def _reply_context_menu(event: tk.Event) -> None:
+        try:
+            reply_text.get(tk.SEL_FIRST, tk.SEL_LAST)
+            has_selection = True
+        except tk.TclError:
+            has_selection = False
+        menu = tk.Menu(reply_text, tearoff=0)
+        if has_selection:
+            menu.add_command(
+                label="Copiar selección",
+                command=lambda: _copy_selection_to_clipboard(reply_text, root),
+            )
+        menu.add_command(
+            label="Copiar todo",
+            command=lambda: _copy_all_reply_to_clipboard(reply_text, root),
+        )
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def _copy_selection_to_clipboard(widget: tk.Text, win: tk.Tk) -> None:
+        try:
+            sel = widget.get(tk.SEL_FIRST, tk.SEL_LAST)
+            if sel:
+                win.clipboard_clear()
+                win.clipboard_append(sel)
+                win.update()
+        except tk.TclError:
+            pass
+
+    def _copy_all_reply_to_clipboard(widget: tk.Text, win: tk.Tk) -> None:
+        text = widget.get("1.0", tk.END).strip()
+        if text:
+            win.clipboard_clear()
+            win.clipboard_append(text)
+            win.update()
+
+    reply_text.bind("<Button-3>", _reply_context_menu)
+
+    def _close_on_enter(event: tk.Event | None = None) -> str | None:
+        root.destroy()
+        return "break"
+
+    root.bind("<Return>", _close_on_enter)
+    reply_text.bind("<Return>", lambda e: _close_on_enter(e))
+
     def _set_reply(content: str) -> None:
-        reply_text.config(state=tk.NORMAL)
         reply_text.delete("1.0", tk.END)
         reply_text.insert(tk.END, content or "")
-        reply_text.config(state=tk.DISABLED)
 
     ttk.Label(main_frame, text="Reply").grid(row=2, column=0, sticky=tk.W)
     reply_text.grid(row=3, column=0, sticky=tk.NSEW, pady=(0, 8))
