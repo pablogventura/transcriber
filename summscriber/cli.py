@@ -229,10 +229,18 @@ def get_fallback_summary(
     if not full_text or not full_text.strip():
         return ""
     sumy_language = _language_to_sumy(language_code)
-    summary_py = summarize_text(full_text, num_sentences=num_sentences)
-    summary_sumy = summarize_text_sumy(
-        full_text, num_sentences=num_sentences, language=sumy_language
-    )
+    summary_py = ""
+    try:
+        summary_py = summarize_text(full_text, num_sentences=num_sentences)
+    except Exception:
+        pass
+    summary_sumy = ""
+    try:
+        summary_sumy = summarize_text_sumy(
+            full_text, num_sentences=num_sentences, language=sumy_language
+        )
+    except Exception:
+        pass
     candidates = [(summary_py, "pysummarization"), (summary_sumy, "sumy")]
     candidates = [(t, n) for t, n in candidates if t]
     return min(candidates, key=lambda x: len(x[0]))[0] if candidates else ""

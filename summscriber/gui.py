@@ -106,7 +106,7 @@ def main() -> None:
     main_frame.grid_rowconfigure(3, weight=1)
     main_frame.grid_columnconfigure(0, weight=1)
 
-    view_var = tk.StringVar(value="original")
+    view_var = tk.StringVar(value="summary")
     summary_content = ""
     full_text_content = ""
 
@@ -266,8 +266,12 @@ def main() -> None:
         summary_content = get_fallback_summary(
             full_text_content, trans.get("language", ""), num_sentences=3
         )
+        if not summary_content:
+            view_var.set("original")
         _update_summary_view()
         _set_reply(_("loading"))
+        root.update_idletasks()
+        root.update()
         threading.Thread(target=_fetch_summary_reply, daemon=True).start()
 
     root.mainloop()
